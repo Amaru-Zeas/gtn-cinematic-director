@@ -4,6 +4,7 @@ import io
 import json
 import logging
 import base64
+import asyncio
 from typing import Any
 
 from PIL import Image
@@ -40,6 +41,7 @@ MODEL_CHOICES_ARGS = [
 
 MODEL_CHOICES = [m["name"] for m in MODEL_CHOICES_ARGS]
 DEFAULT_MODEL = "gpt-5"
+NODE_RUNTIME_VERSION = "async-run-1"
 
 DESCRIBE_PROMPT = (
     "Describe ONLY this character's physical appearance for an image generation prompt. "
@@ -241,6 +243,16 @@ class CinematicDirectorNode(ControlNode):
             )
         )
 
+        self.add_parameter(
+            Parameter(
+                name="runtime_version",
+                output_type="str",
+                tooltip="Temporary node runtime marker for cache verification",
+                allowed_modes={ParameterMode.OUTPUT},
+                ui_options={"hide_property": True},
+            )
+        )
+
         with ParameterGroup(name="Outputs", collapsed=True) as outputs_group:
             Parameter(
                 name="setup_json",
@@ -285,9 +297,10 @@ class CinematicDirectorNode(ControlNode):
         logger.info(f"CinematicDirector: vision → {desc[:200]}")
         return desc
 
-    def process(self) -> None:
+    def _run_generation(self) -> None:
         data = self.get_parameter_value("director_setup") or {}
         model_input = self.get_parameter_value("model") or DEFAULT_MODEL
+        self.parameter_output_values["runtime_version"] = NODE_RUNTIME_VERSION
         if not isinstance(model_input, str) or model_input not in MODEL_CHOICES:
             model_input = DEFAULT_MODEL
 
@@ -444,6 +457,12 @@ class CinematicDirectorNode(ControlNode):
         if environment_setup:
             active_departments.append("ENVIRONMENT")
 
+        if not active_departments:
+            self.parameter_output_values["prompt_output"] = (
+                "No active sections selected. Enable at least one section (Style, Camera, Character, or Environment)."
+            )
+            return
+
         user_message += (
             "★ STRICT DEPARTMENT GATING (CRITICAL):\n"
             f"Only use departments that are ACTIVE in this run: {', '.join(active_departments) if active_departments else 'NONE'}.\n"
@@ -451,13 +470,37 @@ class CinematicDirectorNode(ControlNode):
             "If only one department is active, the final prompt must focus only on that department's information.\n\n"
         )
 
+        inactive_rules = []
+        if "STYLE" not in active_departments:
+            inactive_rules.append(
+                "- STYLE is INACTIVE: do NOT mention genre, medium, rendering style, palette strategy, or named art movements."
+            )
+        if "CAMERA" not in active_departments:
+            inactive_rules.append(
+                "- CAMERA is INACTIVE: do NOT mention camera body/sensor, lens model/type, focal length, aperture, film stock, bokeh, depth of field, or optical artifacts."
+            )
+        if "CHARACTER" not in active_departments:
+            inactive_rules.append(
+                "- CHARACTER is INACTIVE: do NOT mention any person, figure, body, face, expression, pose, clothing, or living being."
+            )
+        if "ENVIRONMENT" not in active_departments:
+            inactive_rules.append(
+                "- ENVIRONMENT is INACTIVE: do NOT mention location/setting, architecture, weather, time-of-day, atmosphere, or scene-building context."
+            )
+
+        if inactive_rules:
+            user_message += "★ INACTIVE DEPARTMENT EXCLUSIONS (MANDATORY):\n"
+            user_message += "\n".join(inactive_rules)
+            user_message += "\n\n"
+
         user_message += "RAW SELECTIONS FROM EACH DEPARTMENT:\n\n"
         user_message += "\n\n".join(pieces)
         user_message += (
             "\n\n══════════════════════════════════════\n"
             "Now fuse ALL of the above into a single, staggeringly detailed image-generation prompt. "
-            "Interleave sections — don't write them as separate blocks. The camera captures the "
-            "character in the environment through the style. 250-400 words, one paragraph, no labels. GO."
+            "Interleave only ACTIVE departments — do not introduce inactive domains. "
+            "Write one paragraph (250-400 words), no labels. "
+            f"If exactly one department is active ({active_departments[0] if len(active_departments) == 1 else 'N/A'}), keep the prompt strictly about that department only. GO."
         )
 
         args = next((m["args"] for m in MODEL_CHOICES_ARGS if m["name"] == model_input), {})
@@ -474,3 +517,11 @@ class CinematicDirectorNode(ControlNode):
             self.append_value_to_parameter("prompt_output", artifact.value)
 
         logger.info(f"CinematicDirector: generated combined prompt with {model_input}")
+
+    def process(self) -> None:
+        self._run_generation()
+
+    async def aprocess(self) -> None:
+        # Keep the async event loop responsive so GTN can display running state.
+        await asyncio.sleep(0)
+        await asyncio.to_thread(self._run_generation)
