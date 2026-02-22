@@ -1,0 +1,65 @@
+{
+    "name": "GTN Cinematic Director",
+    "library_schema_version": "0.1.0",
+    "metadata": {
+        "author": "Griptape Community",
+        "description": "Modular cinematic prompt generation — camera, character, environment, style, and combiner nodes with scroll-wheel widgets and built-in LLM agents.",
+        "library_version": "0.60.0",
+        "engine_version": "0.66.0",
+        "tags": [
+            "Griptape",
+            "Cinema",
+            "Camera",
+            "Character",
+            "Environment",
+            "Style",
+            "Prompt Generation",
+            "Widget",
+            "LLM"
+        ],
+        "dependencies": {
+            "pip_dependencies": [
+                "griptape[drivers-prompt-openai]"
+            ]
+        }
+    },
+    "settings": [
+        {
+            "description": "Griptape Cloud API key for the built-in prompt generation agent",
+            "category": "app_events.on_app_initialization_complete",
+            "contents": {
+                "secrets_to_register": [
+                    "GT_CLOUD_API_KEY"
+                ]
+            }
+        }
+    ],
+    "categories": [
+        {
+            "CinemaWidget": {
+                "color": "border-amber-500",
+                "title": "Cinema Widget",
+                "description": "Modular cinematic prompt generation with scroll-wheel selectors",
+                "icon": "Camera"
+            }
+        }
+    ],
+    "widgets": [
+        {
+            "name": "CinematicDirectorWidget",
+            "path": "CinematicDirectorWidgetV49.js",
+            "description": "All-in-one mega widget: style, camera, character, and environment in one collapsible UI"
+        }
+    ],
+    "nodes": [
+        {
+            "class_name": "CinematicDirectorNode",
+            "file_path": "cinematic_director_node.py",
+            "metadata": {
+                "category": "CinemaWidget",
+                "description": "All-in-one Cinematic Director — style, camera, character (with image), and environment in a single node. One LLM call produces the final combined prompt.",
+                "display_name": "Cinematic Director"
+            }
+        }
+    ]
+}
