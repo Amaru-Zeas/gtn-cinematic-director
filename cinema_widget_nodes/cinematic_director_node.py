@@ -434,6 +434,23 @@ class CinematicDirectorNode(ControlNode):
         else:
             user_message += "★ NO CHARACTER PROVIDED: Do NOT invent or mention any person, figure, or living being.\n\n"
 
+        active_departments = []
+        if style_setup:
+            active_departments.append("STYLE")
+        if camera_setup:
+            active_departments.append("CAMERA")
+        if character_setup or char_description:
+            active_departments.append("CHARACTER")
+        if environment_setup:
+            active_departments.append("ENVIRONMENT")
+
+        user_message += (
+            "★ STRICT DEPARTMENT GATING (CRITICAL):\n"
+            f"Only use departments that are ACTIVE in this run: {', '.join(active_departments) if active_departments else 'NONE'}.\n"
+            "Do NOT infer, invent, or reference values from any inactive/missing department.\n"
+            "If only one department is active, the final prompt must focus only on that department's information.\n\n"
+        )
+
         user_message += "RAW SELECTIONS FROM EACH DEPARTMENT:\n\n"
         user_message += "\n\n".join(pieces)
         user_message += (
